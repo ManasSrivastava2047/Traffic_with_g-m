@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 const regions = [
   'North West Delhi',
@@ -17,6 +18,7 @@ const intersections = [
 ];
 
 export const DriverView: React.FC = () => {
+  const { t } = useTranslation();
   const [region, setRegion] = useState(regions[0]);
   const [intersectionName, setIntersectionName] = useState(intersections[0]);
   const [error, setError] = useState('');
@@ -25,7 +27,7 @@ export const DriverView: React.FC = () => {
 
   const handleConfirm = async () => {
     if (!region || !intersectionName) {
-      setError('Please select both Region and Intersection Name.');
+      setError(t('Please select both Region and Intersection Name.'));
       return;
     }
     setError('');
@@ -44,7 +46,7 @@ export const DriverView: React.FC = () => {
         data = { error: text };
       }
       if (!resp.ok) {
-        setError(data.error || 'Failed to fetch latest data');
+        setError(data.error || t('Failed to fetch latest data'));
         setLatest(null);
       } else {
         setLatest(data.row || null);
@@ -62,10 +64,10 @@ export const DriverView: React.FC = () => {
       <div className="w-full max-w-2xl">
         <div className="space-y-6">
           <div className="p-6 rounded-xl bg-card border border-border">
-            <h2 className="text-xl font-semibold">Driver — Check Intersection</h2>
+            <h2 className="text-xl font-semibold">{t('Driver — Check Intersection')}</h2>
             <div className="mt-4 space-y-3">
               <select
-                aria-label="Select Region"
+                aria-label={t('Select Region')}
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
                 className="w-full p-3 rounded-xl border border-gray-300 bg-transparent text-white"
@@ -77,7 +79,7 @@ export const DriverView: React.FC = () => {
                 ))}
               </select>
               <select
-                aria-label="Select Intersection"
+                aria-label={t('Select Intersection')}
                 value={intersectionName}
                 onChange={(e) => setIntersectionName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-gray-300 bg-transparent text-white"
@@ -90,45 +92,45 @@ export const DriverView: React.FC = () => {
               </select>
               {error && <div className="text-red-400">{error}</div>}
               <div className="flex gap-3 mt-2">
-                <button onClick={handleConfirm} className="bg-primary text-white px-4 py-2 rounded">Confirm Intersection</button>
+                <button onClick={handleConfirm} className="bg-primary text-white px-4 py-2 rounded">{t('Confirm Intersection')}</button>
               </div>
             </div>
           </div>
 
           <div>
-            {loading && <div className="text-sm text-muted-foreground">Loading...</div>}
+            {loading && <div className="text-sm text-muted-foreground">{t('Loading...')}</div>}
             {latest && (
               <div className="p-4 rounded-xl bg-card border border-border">
-                <h3 className="font-semibold mb-4">Traffic Status for {latest.Region_Name} / {latest.Intersection_ID}</h3>
+                <h3 className="font-semibold mb-4">{t('Traffic Status for')} {latest.Region_Name} / {latest.Intersection_ID}</h3>
                 {(() => {
                     const mg = parseInt(String(latest.Max_Green_Time || '0'), 10) || 0;
                     const mv = parseInt(String(latest.Max_Vehicle_Count || '0'), 10) || 0;
                     if (mg > 55) {
                       return (
                         <div className="mt-3 p-3 bg-red-500/10 border border-red-300 rounded">
-                          <div className="font-semibold text-red-600">Traffic density: Very High</div>
-                          <div>Estimated vehicles at intersection: up to {mv} vehicles.</div>
-                          <div>Expect significant delays. Consider alternate routes or avoid the area if possible.</div>
-                          <div className="text-sm text-muted-foreground">Emergency and priority vehicles may be given extended green time.</div>
+                          <div className="font-semibold text-red-600">{t('Traffic density: Very High')}</div>
+                          <div>{t('Estimated vehicles at intersection: up to')} {mv} {t('vehicles.')}</div>
+                          <div>{t('Expect significant delays. Consider alternate routes or avoid the area if possible.')}</div>
+                          <div className="text-sm text-muted-foreground">{t('Emergency and priority vehicles may be given extended green time.')}</div>
                         </div>
                       );
                     }
                     if (mg < 30) {
                       return (
                         <div className="mt-3 p-3 bg-green-500/10 border border-green-300 rounded">
-                          <div className="font-semibold text-green-700">Traffic density: Low</div>
-                          <div>Estimated vehicles at intersection: up to {mv} vehicles.</div>
-                          <div>Traffic is flowing smoothly. Minimal delays expected.</div>
-                          <div className="text-sm text-muted-foreground">You should be able to cross quickly. Drive safely and follow signals.</div>
+                          <div className="font-semibold text-green-700">{t('Traffic density: Low')}</div>
+                          <div>{t('Estimated vehicles at intersection: up to')} {mv} {t('vehicles.')}</div>
+                          <div>{t('Traffic is flowing smoothly. Minimal delays expected.')}</div>
+                          <div className="text-sm text-muted-foreground">{t('You should be able to cross quickly. Drive safely and follow signals.')}</div>
                         </div>
                       );
                     }
                     return (
                       <div className="mt-3 p-3 bg-yellow-500/10 border border-yellow-300 rounded">
-                        <div className="font-semibold text-yellow-800">Traffic density: Moderate</div>
-                        <div>Estimated vehicles at intersection: up to {mv} vehicles.</div>
-                        <div>Some delays possible. Exercise caution and follow traffic directions.</div>
-                        <div className="text-sm text-muted-foreground">Peak adjustments may be active; expect variable signal timings.</div>
+                        <div className="font-semibold text-yellow-800">{t('Traffic density: Moderate')}</div>
+                        <div>{t('Estimated vehicles at intersection: up to')} {mv} {t('vehicles.')}</div>
+                        <div>{t('Some delays possible. Exercise caution and follow traffic directions.')}</div>
+                        <div className="text-sm text-muted-foreground">{t('Peak adjustments may be active; expect variable signal timings.')}</div>
                       </div>
                     );
                   })()}

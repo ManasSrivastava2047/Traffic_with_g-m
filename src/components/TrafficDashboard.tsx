@@ -5,6 +5,7 @@ import { TrafficResults } from './TrafficResults';
 import { TrafficResultsMulti } from './TrafficResultsMulti';
 import { SystemStatus } from './SystemStatus';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface LaneResult {
   laneId: number;
@@ -31,6 +32,7 @@ type AppState = 'setup' | 'upload' | 'processing' | 'results';
 
 export const TrafficDashboard: React.FC = () => {
   // ===== State Variables =====
+  const { t } = useTranslation();
   const [appState, setAppState] = useState<AppState>('setup');
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<DetectionResult | null>(null);
@@ -171,7 +173,7 @@ export const TrafficDashboard: React.FC = () => {
 
   const handleConfirmIntersection = async () => {
     if (!region || !intersectionName) {
-      setError('Please select both Region and Intersection Name.');
+      setError(t('Please select both Region and Intersection Name.'));
       return;
     }
     setError('');
@@ -206,16 +208,16 @@ export const TrafficDashboard: React.FC = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                AI Traffic Management
+                {t('AI Traffic Management')}
               </h1>
-              <p className="text-sm text-muted-foreground">Real-time traffic optimization system</p>
+              <p className="text-sm text-muted-foreground">{t('Real-time traffic optimization system')}</p>
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm">
             <span className="font-mono tabular-nums text-muted-foreground text-base min-w-[88px] text-right">{currentTime}</span>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-              <span className="text-success font-medium">System Online</span>
+              <span className="text-success font-medium">{t('System Online')}</span>
             </div>
           </div>
         </div>
@@ -230,14 +232,14 @@ export const TrafficDashboard: React.FC = () => {
             <div className="space-y-6">
               <Card className="bg-gradient-card border-border shadow-card">
                 <CardHeader>
-                  <CardTitle>Enter Region</CardTitle>
+                  <CardTitle>{t('Enter Region')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <select
                     value={region}
                     onChange={(e) => setRegion(e.target.value)}
                     className="w-full p-3 rounded-xl border border-gray-300 bg-transparent text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-inner transition-all duration-200"
-                    aria-label="Select Region"
+                    aria-label={t('Select Region')}
                   >
                     {regions.map((r) => (
                       <option key={r} value={r} className="bg-card">
@@ -250,14 +252,14 @@ export const TrafficDashboard: React.FC = () => {
 
               <Card className="bg-gradient-card border-border shadow-card">
                 <CardHeader>
-                  <CardTitle>Select Intersection</CardTitle>
+                  <CardTitle>{t('Select Intersection')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <select
                     value={intersectionName}
                     onChange={(e) => setIntersectionName(e.target.value)}
                     className="w-full p-3 rounded-xl border border-gray-300 bg-transparent text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-inner transition-all duration-200"
-                    aria-label="Select Intersection"
+                    aria-label={t('Select Intersection')}
                   >
                     {intersections.map((intersection) => (
                       <option key={intersection} value={intersection} className="bg-card">
@@ -274,7 +276,7 @@ export const TrafficDashboard: React.FC = () => {
                 onClick={handleConfirmIntersection}
                 className="bg-primary text-white px-4 py-2 rounded"
               >
-                Confirm Intersection
+                {t('Confirm Intersection')}
               </button>
             </div>
           )}
@@ -307,29 +309,29 @@ export const TrafficDashboard: React.FC = () => {
           {/* Recent Activity */}
           <Card className="bg-gradient-card border-border shadow-card">
             <CardHeader>
-              <CardTitle className="text-lg">Recent Activity</CardTitle>
+              <CardTitle className="text-lg">{t('Recent Activity')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="text-sm">
                 <div className="flex justify-between items-center mb-1">
                   <span>Highway Junction A</span>
-                  <span className="text-xs text-muted-foreground">2min ago</span>
+                  <span className="text-xs text-muted-foreground">2{t('min ago')}</span>
                 </div>
-                <div className="text-xs text-muted-foreground">15 vehicles detected • 45s signal</div>
+                <div className="text-xs text-muted-foreground">15 {t('vehicles detected')} • 45s {t('signal')}</div>
               </div>
               <div className="text-sm">
                 <div className="flex justify-between items-center mb-1">
                   <span>Main Street Cross</span>
-                  <span className="text-xs text-muted-foreground">5min ago</span>
+                  <span className="text-xs text-muted-foreground">5{t('min ago')}</span>
                 </div>
-                <div className="text-xs text-muted-foreground">8 vehicles detected • 32s signal</div>
+                <div className="text-xs text-muted-foreground">8 {t('vehicles detected')} • 32s {t('signal')}</div>
               </div>
               <div className="text-sm">
                 <div className="flex justify-between items-center mb-1">
                   <span>Park Avenue</span>
-                  <span className="text-xs text-muted-foreground">12min ago</span>
+                  <span className="text-xs text-muted-foreground">12{t('min ago')}</span>
                 </div>
-                <div className="text-xs text-muted-foreground">22 vehicles detected • 60s signal</div>
+                <div className="text-xs text-muted-foreground">22 {t('vehicles detected')} • 60s {t('signal')}</div>
               </div>
             </CardContent>
           </Card>

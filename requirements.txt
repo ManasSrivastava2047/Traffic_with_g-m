@@ -5,3 +5,4 @@ ultralytics
 torch
 opencv-python
 pillow
+google-generativeai

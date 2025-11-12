@@ -6,9 +6,10 @@ from ultralytics import YOLO
 import torch
 from PIL import Image
 import cv2
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
 import datetime as _dt
+import google.generativeai as genai
 
 from stream_processor import StreamProcessor, analyze_video_file
 from db import init_db, insert_result
@@ -18,6 +19,227 @@ from db import fetch_latest_result
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
+
+# Google Gemini API Configuration
+GEMINI_API_KEY = "AIzaSyDq-jlX5W8ygMZy7eRzr6mwMuBTXvy3Yt4"
+genai.configure(api_key=GEMINI_API_KEY)
+
+# Initialize Gemini model (try different models until one works)
+GEMINI_MODEL = None
+# Model preference list for free tier API key - prioritize flash models for better performance
+MODEL_NAMES_TO_TRY = [
+    'gemini-2.0-flash',  # Latest flash model
+    'gemini-1.5-flash-latest',  # Latest 1.5 flash
+    'gemini-1.5-flash',  # Stable 1.5 flash (best for free tier)
+    'gemini-1.5-pro-latest',  # 1.5 pro latest
+    'gemini-1.5-pro',  # Stable 1.5 pro
+    'gemini-pro',  # Legacy pro
+    'gemini-1.0-pro-latest',  # 1.0 pro latest
+    'gemini-1.0-pro'  # Stable 1.0 pro
+]
+
+# Try to initialize a working model
+print("[Gemini] Initializing translation model...")
+try:
+    # Try to list available models first
+    available_models = genai.list_models()
+    available_model_names = []
+    for m in available_models:
+        # Extract model name (format: models/gemini-1.5-flash)
+        if hasattr(m, 'name'):
+            model_name = m.name.split('/')[-1] if '/' in m.name else m.name
+            # Skip embedding models - only include generative models
+            if 'embedding' not in model_name.lower() and 'gecko' not in model_name.lower():
+                available_model_names.append(model_name)
+        elif isinstance(m, str):
+            model_name = m.split('/')[-1] if '/' in m else m
+            if 'embedding' not in model_name.lower() and 'gecko' not in model_name.lower():
+                available_model_names.append(model_name)
+    
+    print(f"[Gemini] Available generative models: {available_model_names}")
+    
+    # Find the first available model from our preference list
+    for preferred_model in MODEL_NAMES_TO_TRY:
+        # Check if model name matches (handle different formats)
+        for available_model in available_model_names:
+            if preferred_model == available_model or available_model.endswith(preferred_model):
+                GEMINI_MODEL = preferred_model
+                print(f"[Gemini] Selected model: {preferred_model}")
+                break
+        if GEMINI_MODEL:
+            break
+    
+    # If no match found, use first available generative model or fallback
+    if GEMINI_MODEL is None:
+        if available_model_names:
+            GEMINI_MODEL = available_model_names[0]
+            print(f"[Gemini] Using first available generative model: {GEMINI_MODEL}")
+        else:
+            GEMINI_MODEL = 'gemini-1.5-flash'
+            print(f"[Gemini] No models found, using hardcoded default: {GEMINI_MODEL}")
+            
+except Exception as e:
+    print(f"[Gemini] Could not list models: {e}")
+    # Fallback: use stable flash model (best for free tier)
+    GEMINI_MODEL = 'gemini-1.5-flash'
+    print(f"[Gemini] Using fallback model: {GEMINI_MODEL}")
+
+if GEMINI_MODEL is None:
+    print("[Gemini] WARNING: No Gemini model configured. Translation will fail.")
+    GEMINI_MODEL = 'gemini-1.5-flash'  # Final fallback - best for free tier
+
+# State to Language Mapping for Indian States and UTs
+STATE_TO_LANGUAGE = {
+    'Andhra Pradesh': 'Telugu',
+    'Arunachal Pradesh': 'English',  # Multiple languages, defaulting to English
+    'Assam': 'Assamese',
+    'Bihar': 'Hindi',
+    'Chhattisgarh': 'Hindi',
+    'Goa': 'Konkani',
+    'Gujarat': 'Gujarati',
+    'Haryana': 'Hindi',
+    'Himachal Pradesh': 'Hindi',
+    'Jharkhand': 'Hindi',
+    'Karnataka': 'Kannada',
+    'Kerala': 'Malayalam',
+    'Madhya Pradesh': 'Hindi',
+    'Maharashtra': 'Marathi',
+    'Manipur': 'Manipuri',
+    'Meghalaya': 'English',  # Multiple languages
+    'Mizoram': 'Mizo',
+    'Nagaland': 'English',  # Multiple languages
+    'Odisha': 'Odia',
+    'Punjab': 'Punjabi',
+    'Rajasthan': 'Hindi',
+    'Sikkim': 'Nepali',
+    'Tamil Nadu': 'Tamil',
+    'Telangana': 'Telugu',
+    'Tripura': 'Bengali',
+    'Uttar Pradesh': 'Hindi',
+    'Uttarakhand': 'Hindi',
+    'West Bengal': 'Bengali',
+    'Andaman and Nicobar Islands': 'Hindi',
+    'Chandigarh': 'Hindi',
+    'Dadra and Nagar Haveli and Daman and Diu': 'Hindi',
+    'Delhi': 'English',
+    'Jammu and Kashmir': 'Urdu',
+    'Ladakh': 'Hindi',
+    'Lakshadweep': 'Malayalam',
+    'Puducherry': 'Tamil',
+}
+
+# Translation cache to avoid repeated API calls
+translation_cache: Dict[str, str] = {}
+
+def get_language_for_state(state: str) -> str:
+    """Get the primary language for a given Indian state or UT."""
+    return STATE_TO_LANGUAGE.get(state, 'Hindi')  # Default to Hindi if state not found
+
+def translate_text(text: str, target_language: str) -> str:
+    """Translate text to target language using Google Gemini API."""
+    if not text or not target_language:
+        return text
+    
+    # Don't translate if language is English
+    if target_language.lower() == 'english':
+        return text
+    
+    # Check cache first
+    cache_key = f"{text}:{target_language}"
+    if cache_key in translation_cache:
+        return translation_cache[cache_key]
+    
+    # If no working model was found, return original text
+    if GEMINI_MODEL is None:
+        print(f"[Translation Error] No Gemini model available. Returning original text for '{text[:30]}...'")
+        return text
+    
+    try:
+        # Use the working Gemini model
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        
+        # Create a clear, simple translation prompt
+        prompt = f"""Translate the following English text to {target_language}. 
+        
+Rules:
+- Return ONLY the translation, no explanations
+- Do not add quotes or markdown
+- Keep the same meaning and tone
+- If the text is a UI label or button, keep it concise
+
+Text to translate: {text}
+
+Translation:"""
+        
+        response = model.generate_content(prompt)
+        translated = response.text.strip()
+        
+        # Clean up the translation
+        # Remove quotes if present
+        if translated.startswith('"') and translated.endswith('"'):
+            translated = translated[1:-1]
+        if translated.startswith("'") and translated.endswith("'"):
+            translated = translated[1:-1]
+        
+        # Remove any markdown code blocks
+        translated = translated.replace('```', '').strip()
+        
+        # Remove common prefixes that models sometimes add
+        prefixes_to_remove = ['Translation:', 'Translated text:', f'{target_language} translation:']
+        for prefix in prefixes_to_remove:
+            if translated.lower().startswith(prefix.lower()):
+                translated = translated[len(prefix):].strip()
+        
+        # Cache the translation
+        translation_cache[cache_key] = translated
+        print(f"[Translation Success] '{text[:30]}...' -> '{translated[:30]}...' ({target_language})")
+        return translated
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[Translation Error] Failed to translate '{text[:30]}...' to {target_language}: {error_msg}")
+        
+        # If it's a model not found error, try alternative models
+        if 'not found' in error_msg.lower() or '404' in error_msg:
+            print(f"[Translation] Trying alternative models...")
+            for model_name in MODEL_NAMES_TO_TRY:
+                if model_name == GEMINI_MODEL:
+                    continue
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    prompt = f"Translate to {target_language}: {text}"
+                    response = model.generate_content(prompt)
+                    translated = response.text.strip()
+                    translation_cache[cache_key] = translated
+                    print(f"[Translation Success] Used fallback model {model_name}")
+                    return translated
+                except:
+                    continue
+        
+        # Return original text on error
+        return text
+
+def translate_dict(data: Dict, target_language: str) -> Dict:
+    """Recursively translate all string values in a dictionary."""
+    if target_language == 'English':
+        return data
+    
+    translated = {}
+    for key, value in data.items():
+        if isinstance(value, str) and value:
+            translated[key] = translate_text(value, target_language)
+        elif isinstance(value, dict):
+            translated[key] = translate_dict(value, target_language)
+        elif isinstance(value, list):
+            translated[key] = [
+                translate_dict(item, target_language) if isinstance(item, dict)
+                else translate_text(item, target_language) if isinstance(item, str)
+                else item
+                for item in value
+            ]
+        else:
+            translated[key] = value
+    return translated
 
 # Initialize DB (creates database + table if missing)
 try:
@@ -757,6 +979,97 @@ def db_latest():
         return jsonify({'ok': True, 'row': row})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/translate', methods=['POST'])
+def translate():
+    """Translate text or a dictionary of texts to a target language.
+    
+    POST body (JSON):
+    {
+        "text": "Text to translate" OR "texts": {"key1": "text1", "key2": "text2"},
+        "state": "State name" OR "target_language": "Language name"
+    }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        state = data.get('state', '')
+        target_language = data.get('target_language', '')
+        
+        # Get language from state if provided
+        if state and not target_language:
+            target_language = get_language_for_state(state)
+        
+        if not target_language:
+            return jsonify({'error': 'Either state or target_language must be provided'}), 400
+        
+        # Handle single text
+        if 'text' in data:
+            translated = translate_text(data['text'], target_language)
+            return jsonify({'translated': translated, 'language': target_language})
+        
+        # Handle dictionary of texts
+        if 'texts' in data:
+            translated = translate_dict(data['texts'], target_language)
+            return jsonify({'translated': translated, 'language': target_language})
+        
+        return jsonify({'error': 'Either text or texts must be provided'}), 400
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/translate/batch', methods=['POST'])
+def translate_batch():
+    """Translate multiple texts in a single API call for efficiency.
+    
+    POST body (JSON):
+    {
+        "texts": ["text1", "text2", "text3"],
+        "state": "State name" OR "target_language": "Language name"
+    }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        state = data.get('state', '')
+        target_language = data.get('target_language', '')
+        texts = data.get('texts', [])
+        
+        if not texts:
+            return jsonify({'error': 'texts array must be provided'}), 400
+        
+        # Get language from state if provided
+        if state and not target_language:
+            target_language = get_language_for_state(state)
+        
+        if not target_language:
+            return jsonify({'error': 'Either state or target_language must be provided'}), 400
+        
+        # Translate all texts
+        translated_texts = []
+        for text in texts:
+            translated = translate_text(text, target_language)
+            translated_texts.append(translated)
+        
+        return jsonify({
+            'translated': translated_texts,
+            'language': target_language
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/language/state', methods=['GET'])
+def get_language_for_state_endpoint():
+    """Get the language for a given state.
+    
+    Query params: state
+    """
+    state = request.args.get('state', '')
+    if not state:
+        return jsonify({'error': 'state parameter is required'}), 400
+    
+    language = get_language_for_state(state)
+    return jsonify({'state': state, 'language': language})
 
 
 if __name__ == '__main__':
