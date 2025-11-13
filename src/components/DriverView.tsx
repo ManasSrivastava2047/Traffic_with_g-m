@@ -147,11 +147,18 @@ export const DriverView: React.FC<DriverViewProps> = ({ onBack }) => {
       if (!coords) return;
 
       const mg = parseInt(String(intersection.Max_Green_Time || '0'), 10) || 0;
-      let color = '#4CAF50'; // Green for low
-      if (mg > 55) {
-        color = '#F44336'; // Red for high
-      } else if (mg >= 30) {
-        color = '#FF9800'; // Orange for moderate
+      const vc = parseInt(String(intersection.Max_Vehicle_Count || '0'), 10) || 0;
+
+      // Density-based coloring derived from current vehicle count
+      // Thresholds:
+      // <20 Low (green), 20-35 Moderate (orange), 35-49 High (red), >=50 Very High (maroon)
+      let color = '#4CAF50'; // Low
+      if (vc >= 50) {
+        color = '#800000'; // Very High (maroon)
+      } else if (vc >= 35) {
+        color = '#F44336'; // High (red)
+      } else if (vc >= 20) {
+        color = '#FF9800'; // Moderate (orange)
       }
 
       const marker = new google.maps.Marker({
@@ -166,12 +173,7 @@ export const DriverView: React.FC<DriverViewProps> = ({ onBack }) => {
           strokeColor: '#FFFFFF',
           strokeWeight: 2,
         },
-        label: {
-          text: String(intersection.Max_Vehicle_Count || 0),
-          color: '#FFFFFF',
-          fontSize: '12px',
-          fontWeight: 'bold',
-        },
+        // Remove numeric count label on marker; color now represents density
       });
 
       // Add info window
@@ -180,10 +182,10 @@ export const DriverView: React.FC<DriverViewProps> = ({ onBack }) => {
           <div style="padding: 8px;">
             <h3 style="margin: 0 0 8px 0; font-size: 16px;">${intersection.Intersection_ID}</h3>
             <p style="margin: 4px 0;"><strong>Region:</strong> ${intersection.Region_Name}</p>
-            <p style="margin: 4px 0;"><strong>Vehicles:</strong> ${intersection.Max_Vehicle_Count || 0}</p>
+            <p style="margin: 4px 0;"><strong>Vehicles:</strong> ${vc}</p>
             <p style="margin: 4px 0;"><strong>Green Time:</strong> ${mg}s</p>
             <p style="margin: 4px 0; color: ${color};"><strong>Density:</strong> ${
-              mg > 55 ? 'Very High' : mg < 30 ? 'Low' : 'Moderate'
+              vc >= 50 ? 'Very High' : vc >= 35 ? 'High' : vc >= 20 ? 'Moderate' : 'Low'
             }</p>
           </div>
         `,
@@ -252,26 +254,34 @@ export const DriverView: React.FC<DriverViewProps> = ({ onBack }) => {
           <div className="space-y-4">
             <div className="p-4 rounded-xl bg-card border border-border">
               <h2 className="text-xl font-semibold mb-4">{t('Live Traffic Map')}</h2>
-              <div className="mb-4 flex gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                  <span>Low</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-orange-500"></div>
-                  <span>Moderate</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-red-500"></div>
-                  <span>Very High</span>
-                </div>
-              </div>
               <div className="relative w-full h-[500px] rounded-lg border border-border overflow-hidden bg-gray-900">
                 <div 
                   ref={mapRef} 
                   className="w-full h-full"
                   style={{ minHeight: '500px', width: '100%' }}
                 />
+                {/* Density Legend (side overlay) */}
+                <div className="absolute top-4 right-4 z-10 bg-card/90 backdrop-blur rounded-md border border-border p-3 text-xs text-foreground shadow-card">
+                  <div className="font-semibold mb-2">Traffic Density</div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#4CAF50' }}></div>
+                      <span>Low (&lt; 20)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FF9800' }}></div>
+                      <span>Moderate (20 - 35)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F44336' }}></div>
+                      <span>High (35 - 49)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#800000' }}></div>
+                      <span>Very High (50+)</span>
+                    </div>
+                  </div>
+                </div>
                 {mapLoading && (
                   <div className="absolute inset-0 flex items-center justify-center bg-card/80 text-muted-foreground z-10">
                     {t('Loading map...')}
