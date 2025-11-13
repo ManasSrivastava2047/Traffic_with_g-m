@@ -47,6 +47,10 @@ const DEFAULT_TRANSLATIONS: Record<string, string> = {
   'vehicles detected': 'vehicles detected',
   'signal': 'signal',
   'min ago': 'min ago',
+  'Back': 'Back',
+  'Live Traffic Map': 'Live Traffic Map',
+  'Check Specific Intersection': 'Check Specific Intersection',
+  'Loading map...': 'Loading map...',
 };
 
 interface TranslationProviderProps {

@@ -54,8 +54,8 @@ const Index = () => {
   const [role, setRole] = useState<'selector' | 'authority' | 'driver'>('selector');
   const { selectedState, setSelectedState, t } = useTranslation();
 
-  if (role === 'authority') return <TrafficDashboard />;
-  if (role === 'driver') return <DriverView />;
+  if (role === 'authority') return <TrafficDashboard onBack={() => setRole('selector')} />;
+  if (role === 'driver') return <DriverView onBack={() => setRole('selector')} />;
 
   return (
     <div className="min-h-screen bg-gradient-bg relative">

@@ -6,7 +6,7 @@ from datetime import date, datetime
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'Krrishsql@123',
+    'password': 'maruti2004#',
     'database': 'traffic_db',
 }
 
@@ -124,3 +124,41 @@ def fetch_latest_result(region_name: str, intersection_id: str):
         except Exception:
             pass
         return None
+
+
+def fetch_all_latest_intersections():
+    """Return the most recent result for each unique region/intersection combination.
+
+    Returns a list of dicts.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        sql = (
+            "SELECT r1.* FROM results r1 "
+            "INNER JOIN ("
+            "  SELECT Region_Name, Intersection_ID, MAX(id) as max_id "
+            "  FROM results "
+            "  WHERE Region_Name IS NOT NULL AND Region_Name != '' "
+            "    AND Intersection_ID IS NOT NULL AND Intersection_ID != '' "
+            "  GROUP BY Region_Name, Intersection_ID"
+            ") r2 ON r1.Region_Name = r2.Region_Name "
+            "  AND r1.Intersection_ID = r2.Intersection_ID "
+            "  AND r1.id = r2.max_id"
+        )
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return rows
+    except mysql.connector.Error as err:
+        print(f"[db] Error fetching all latest intersections: {err}")
+        try:
+            cursor.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return []

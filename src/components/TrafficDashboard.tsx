@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Zap } from 'lucide-react';
+import { Activity, Zap, ArrowLeft } from 'lucide-react';
 import { TrafficUpload } from './TrafficUpload';
 import { TrafficResults } from './TrafficResults';
 import { TrafficResultsMulti } from './TrafficResultsMulti';
@@ -30,7 +30,11 @@ interface DetectionResult {
 
 type AppState = 'setup' | 'upload' | 'processing' | 'results';
 
-export const TrafficDashboard: React.FC = () => {
+interface TrafficDashboardProps {
+  onBack?: () => void;
+}
+
+export const TrafficDashboard: React.FC<TrafficDashboardProps> = ({ onBack }) => {
   // ===== State Variables =====
   const { t } = useTranslation();
   const [appState, setAppState] = useState<AppState>('setup');
@@ -203,6 +207,15 @@ export const TrafficDashboard: React.FC = () => {
       <div className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="mr-2 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>{t('Back')}</span>
+              </button>
+            )}
             <div className="p-2 bg-primary/10 rounded-lg">
               <Activity className="w-6 h-6 text-primary" />
             </div>

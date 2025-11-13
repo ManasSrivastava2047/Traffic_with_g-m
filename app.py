@@ -13,7 +13,7 @@ import google.generativeai as genai
 
 from stream_processor import StreamProcessor, analyze_video_file
 from db import init_db, insert_result
-from db import fetch_latest_result
+from db import fetch_latest_result, fetch_all_latest_intersections
 
 
 # Initialize Flask app
@@ -977,6 +977,29 @@ def db_latest():
             except Exception:
                 row[k] = str(v)
         return jsonify({'ok': True, 'row': row})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/db/all-intersections', methods=['GET'])
+def db_all_intersections():
+    """Return the latest stored result for all unique region/intersection combinations.
+
+    Returns a list of all intersections with their latest traffic data.
+    """
+    try:
+        rows = fetch_all_latest_intersections()
+        # Convert any non-JSON-serializable types to strings
+        for row in rows:
+            for k, v in list(row.items()):
+                try:
+                    if isinstance(v, (_dt.datetime, _dt.date, _dt.time, _dt.timedelta)):
+                        row[k] = str(v)
+                    else:
+                        row[k] = v
+                except Exception:
+                    row[k] = str(v)
+        return jsonify({'ok': True, 'intersections': rows})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
